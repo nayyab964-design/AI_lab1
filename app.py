@@ -16,7 +16,6 @@ st.title("📊 Customer Churn Prediction System")
 # ---------------- LOAD MODEL ----------------
 @st.cache_resource
 def load_model():
-    # Make sure 'best_churn_model.pkl' is the exact name in your repo
     with open("best_churn_model.pkl", "rb") as file:
         model = pickle.load(file)
     return model
@@ -24,7 +23,7 @@ def load_model():
 model = load_model()
 st.success("Model loaded successfully!")
 
-# ---------------- LAYOUT ----------------
+# ---------------- LAYOUT (Inputs) ----------------
 col1, col2 = st.columns(2)
 
 with col1:
@@ -37,66 +36,70 @@ with col1:
 with col2:
     st.subheader("Account Information")
     tenure = st.slider("Tenure (months)", 0, 72, 12)
-    monthly_charges = st.number_input(
-        "Monthly Charges ($)",
-        min_value=0.0,
-        max_value=200.0,
-        value=70.0
-    )
+    monthly_charges = st.number_input("Monthly Charges ($)", min_value=0.0, value=70.0)
+    total_charges = st.number_input("Total Charges ($)", min_value=0.0, value=70.0)
 
 # ---------------- PREDICTION LOGIC ----------------
 if st.button("Predict Churn", type="primary"):
 
-    # 1. Inputs dictionary
+    # 1. Map Inputs directly to the Names expected by the model
     input_data = {
         "SeniorCitizen": 1 if senior_citizen == "Yes" else 0,
-        "Partner": 1 if partner == "Yes" else 0,
-        "Dependents": 1 if dependents == "Yes" else 0,
         "tenure": tenure,
-        "MonthlyCharges": monthly_charges
+        "MonthlyCharges": monthly_charges,
+        "TotalCharges": total_charges,
+        "gender_Male": 1 if gender == "Male" else 0,
+        "Partner_Yes": 1 if partner == "Yes" else 0,
+        "Dependents_Yes": 1 if dependents == "Yes" else 0,
+        # Default binary features based on your logs
+        "PhoneService_Yes": 1, 
+        "PaperlessBilling_Yes": 1
     }
 
-    # 2. DataFrame conversion
     input_df = pd.DataFrame([input_data])
 
-    # 3. Feature Alignment 
-    # NOTE: These must be the EXACT columns from your Week 3 training
-    expected_features = ['SeniorCitizen', 'tenure', 'MonthlyCharges', 'Partner', 'Dependents']
-    
+    # 2. FULL FEATURE ALIGNMENT (Based on your Error Log)
+    # Ye wo exact list hai jo model expect kar raha hai
+    expected_features = [
+        'SeniorCitizen', 'tenure', 'MonthlyCharges', 'TotalCharges', 'gender_Male', 
+        'Partner_Yes', 'Dependents_Yes', 'PhoneService_Yes', 
+        'MultipleLines_No phone service', 'MultipleLines_Yes', 
+        'InternetService_Fiber optic', 'InternetService_No', 
+        'OnlineSecurity_No internet service', 'OnlineSecurity_Yes', 
+        'OnlineBackup_No internet service', 'OnlineBackup_Yes', 
+        'DeviceProtection_No internet service', 'DeviceProtection_Yes', 
+        'TechSupport_No internet service', 'TechSupport_Yes', 
+        'StreamingTV_No internet service', 'StreamingTV_Yes', 
+        'StreamingMovies_No internet service', 'StreamingMovies_Yes', 
+        'Contract_One year', 'Contract_Two year', 'PaperlessBilling_Yes', 
+        'PaymentMethod_Credit card (automatic)', 'PaymentMethod_Electronic check', 
+        'PaymentMethod_Mailed check'
+    ]
+
+    # Jo columns input form mein nahi hain, unhein 0 set karein
     for col in expected_features:
         if col not in input_df.columns:
             input_df[col] = 0
+            
+    # Order alignment
     input_df = input_df[expected_features]
 
-    # 4. Prediction
+    # 3. Prediction
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0]
     churn_prob = probability[1] * 100
 
     # ---------------- RESULTS ----------------
     if prediction == 1:
-        st.error("⚠️ HIGH RISK: Customer likely to churn")
-        st.metric("Churn Probability", f"{churn_prob:.1f}%")
+        st.error(f"⚠️ HIGH RISK: Customer likely to churn ({churn_prob:.1f}%)")
     else:
-        st.success("✅ LOW RISK: Customer likely to stay")
-        st.metric("Retention Probability", f"{100 - churn_prob:.1f}%")
+        st.success(f"✅ LOW RISK: Customer likely to stay ({100 - churn_prob:.1f}% Retention)")
 
-    # ---------------- VISUALIZATION ----------------
+    # Gauge Chart
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=churn_prob,
         title={"text": "Churn Risk (%)"},
-        gauge={
-            "axis": {"range": [0, 100]},
-            "bar": {"color": "red" if churn_prob > 50 else "green"},
-            "steps": [
-                {"range": [0, 30], "color": "lightgreen"},
-                {"range": [30, 70], "color": "yellow"},
-                {"range": [70, 100], "color": "salmon"}
-            ]
-        }
+        gauge={'axis': {'range': [0, 100]}, 'bar': {'color': "red" if churn_prob > 50 else "green"}}
     ))
     st.plotly_chart(fig)
-
-    if churn_prob > 70:
-        st.warning("Recommendation: Offer a discount or loyalty plan to retain this customer.")
