@@ -16,6 +16,7 @@ st.title("📊 Customer Churn Prediction System")
 # ---------------- LOAD MODEL ----------------
 @st.cache_resource
 def load_model():
+    # File name must match your repo exactly
     with open("best_churn_model.pkl", "rb") as file:
         model = pickle.load(file)
     return model
@@ -43,12 +44,11 @@ with col2:
         value=70.0
     )
 
-# ---------------- PREDICTION ----------------
+# ---------------- PREDICTION LOGIC ----------------
 if st.button("Predict Churn", type="primary"):
 
-    # Create input dataframe
+    # 1. Replicating your Week 3 Binary Encoding
     input_data = {
-        "gender": gender,
         "SeniorCitizen": 1 if senior_citizen == "Yes" else 0,
         "Partner": 1 if partner == "Yes" else 0,
         "Dependents": 1 if dependents == "Yes" else 0,
@@ -58,12 +58,21 @@ if st.button("Predict Churn", type="primary"):
 
     input_df = pd.DataFrame([input_data])
 
-    # Encode input
-    input_encoded = pd.get_dummies(input_df)
+    # 2. FEATURE ALIGNMENT (Fixes the ValueError)
+    # This list must include EVERY numeric column from your Week 3 X_train
+    expected_features = ['SeniorCitizen', 'tenure', 'MonthlyCharges', 'Partner', 'Dependents'] 
+    
+    # Ensure all expected columns exist (even those not in the form)
+    for col in expected_features:
+        if col not in input_df.columns:
+            input_df[col] = 0
+            
+    # Reorder columns to match the training set exactly
+    input_df = input_df[expected_features]
 
-    # Prediction
-    prediction = model.predict(input_encoded)[0]
-    probability = model.predict_proba(input_encoded)[0]
+    # 3. PREDICTION
+    prediction = model.predict(input_df)[0]
+    probability = model.predict_proba(input_df)[0]
     churn_prob = probability[1] * 100
 
     # ---------------- RESULTS ----------------
@@ -75,12 +84,23 @@ if st.button("Predict Churn", type="primary"):
         st.metric("Retention Probability", f"{100 - churn_prob:.1f}%")
 
     # ---------------- VISUALIZATION ----------------
+    # Gauge chart as required by deliverables
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=churn_prob,
-        title={"text": "Churn Risk"},
-        gauge={"axis": {"range": [0, 100]},
-               "bar": {"color": "red"}}
+        title={"text": "Churn Risk (%)"},
+        gauge={
+            "axis": {"range": [0, 100]},
+            "bar": {"color": "red" if churn_prob > 50 else "green"},
+            "steps": [
+                {"range": [0, 30], "color": "lightgreen"},
+                {"range": [30, 70], "color": "yellow"},
+                {"range": [70, 100], "color": "salmon"}
+            ]
+        }
     ))
-
     st.plotly_chart(fig)
+
+    # Business Recommendation
+    if churn_prob > 70:
+        st.
