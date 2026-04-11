@@ -10,3 +10,23 @@ page_title='Customer Churn Predictor', page_icon=' ', layout='wide'
 'rb') as file: 
   model = pickle.load(file) return model model = 
 load_model() st.success(' Model loaded successfully!')
+col1, col2 = st.columns(2) with col1: st.subheader('Customer 
+Demographics') gender = st.selectbox('Gender', ['Male', 'Female']) 
+senior_citizen = st.selectbox('Senior Citizen', ['No', 'Yes']) partner = 
+st.selectbox('Partner', ['No', 'Yes']) dependents = 
+st.selectbox('Dependents', ['No', 'Yes']) with col2: 
+st.subheader('Account Information') tenure = st.slider('Tenure (months)', 
+0, 72, 12) monthly_charges = st.number_input( 'Monthly Charges 
+($)', min_value=0.0, max_value=200.0, value=70.0)
+if st.button(' Predict Churn', type='primary'): # Create input 
+dataframe input_data = { 'gender': gender, 
+'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0, 'tenure': 
+tenure, 'MonthlyCharges': monthly_charges } input_df = 
+pd.DataFrame([input_data])
+# Encode and predict input_encoded = pd.get_dummies(input_df) 
+prediction = model.predict(input_encoded)[0] probability = 
+model.predict_proba(input_encoded)[0] churn_prob = probability[1] * 100
+ if prediction == 1: st.error(' HIGH RISK: Customer likely to 
+churn') st.metric('Churn Probability', f'{churn_prob:.1f}%') 
+else: st.success(' LOW RISK: Customer likely to stay') 
+st.metric('Retention Probability', f'{100-churn_prob:.1f}%')
